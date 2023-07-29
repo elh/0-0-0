@@ -36,10 +36,7 @@ function Board({ onMoveFn = (history) => { }}) {
       width={400}
       position={fen}
       onDrop={onDrop}
-      boardStyle={{
-        borderRadius: "5px",
-        boxShadow: `0 5px 15px rgba(0, 0, 0, 0.5)`
-      }}
+      boardStyle={{}}
       squareStyles={squareStyles}
       dropSquareStyle={dropSquareStyle}
       onDragOverSquare={onDragOverSquare}
@@ -47,22 +44,40 @@ function Board({ onMoveFn = (history) => { }}) {
   )
 }
 
+// TODO: more structure on expected outputs. e.g. plans, threats, alternatives
+// TODO: give it engine evals
+const sysPrompt = `
+Your task is to help explain what is going on in a given chess game.
+Explain at a 1400 ELO level.
+`.trim();
+
 export default function App() {
   const [explanation, setExplanation] = React.useState("");
   const resultRef = useRef("");
 
+  // TODO: singleton. should cancel in flight requests
   const onMoveFn = async (history) => {
     resultRef.current = "";
+    if (!process.env.REACT_APP_OPENAI_API_KEY) {
+      setExplanation("WARN: REACT_APP_OPENAI_API_KEY required");
+      return;
+    }
 
-    // TODO: use chat 3.5 model
-    let url = "https://api.openai.com/v1/completions";
+    let url = "https://api.openai.com/v1/chat/completions";
     let data = {
-      model: "text-davinci-003",
-      prompt: `explain this chess game so far ${history}`,
+      model: "gpt-3.5-turbo",
       temperature: 0.7,
+      messages: [
+        {
+          "role": "system",
+          "content": sysPrompt
+        },
+        {
+          "role": "user",
+          "content": `Game:\n${history}`
+        }
+      ],
       stream: true,
-      max_tokens: 2000,
-      n: 1,
     };
 
     let source = new SSE(url, {
@@ -75,11 +90,13 @@ export default function App() {
     });
 
     source.addEventListener("message", (e) => {
-      if (e.data != "[DONE]") {
+      if (e.data !== "[DONE]") {
         let payload = JSON.parse(e.data);
-        let text = payload.choices[0].text;
-        resultRef.current = resultRef.current + text;
-        setExplanation(resultRef.current);
+        let text = payload.choices[0].delta.content;
+        if (text) {
+          resultRef.current = resultRef.current + text;
+          setExplanation(resultRef.current);
+        }
       } else {
         source.close();
       }
@@ -92,7 +109,7 @@ export default function App() {
   return (
     <div>
       <Board onMoveFn={onMoveFn}/>
-      <pre>{explanation}</pre>
+      <div>{explanation}</div>
     </div>
   )
 }
