@@ -81,8 +81,8 @@ Explain at a 1400 ELO level.
 export default function App() {
   const [explanation, setExplanation] = React.useState("");
   const resultRef = useRef("");
+  const sourceRef = useRef(null);
 
-  // TODO: singleton. should cancel in flight requests
   const onMoveFn = async (history) => {
     resultRef.current = "";
     if (!process.env.REACT_APP_OPENAI_API_KEY) {
@@ -107,7 +107,12 @@ export default function App() {
       stream: true,
     };
 
-    let source = new SSE(url, {
+    // kill current stream if it exists
+    if (sourceRef.current) {
+      sourceRef.current.close();
+    }
+
+    sourceRef.current = new SSE(url, {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`,
@@ -116,7 +121,7 @@ export default function App() {
       payload: JSON.stringify(data),
     });
 
-    source.addEventListener("message", (e) => {
+    sourceRef.current.addEventListener("message", (e) => {
       if (e.data !== "[DONE]") {
         let payload = JSON.parse(e.data);
         let text = payload.choices[0].delta.content;
@@ -125,11 +130,11 @@ export default function App() {
           setExplanation(resultRef.current);
         }
       } else {
-        source.close();
+        sourceRef.current.close();
       }
     });
 
-    source.stream();
+    sourceRef.current.stream();
   };
 
   return (
