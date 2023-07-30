@@ -3,7 +3,7 @@ import { Chess } from "chess.js";
 import Chessboard from "chessboardjsx";
 import { SSE } from "sse.js";
 
-function Board({ onMoveFn = (history) => { }}) {
+function Board({ onMoveFn = (history, fen) => { }}) {
   const [fen, setFen] = React.useState("start");
   const [dropSquareStyle, setDropSquareStyle] = React.useState({});
   const [squareStyles, setSquareStyles] = React.useState({});
@@ -41,7 +41,7 @@ function Board({ onMoveFn = (history) => { }}) {
 
     setFen(game.current.fen());
     setSquareStyles(squareStyling(game.current.history({ verbose: true })))
-    onMoveFn(game.current.history());
+    onMoveFn(game.current.history(), game.current.fen());
   };
 
   const onDragOverSquare = _ => {
@@ -74,6 +74,7 @@ const sysPrompt = `
 Your task is to help explain the last move in a given chess game.
 Do not explain the previous moves in the game; focus only on the last move.
 Explain concisely in no more than 4 sentences.
+Explain briefly the key idea behind the move and if this is a good move.
 Do not reiterate what the last move was; just immediately explain the idea behind it.
 Explain at a 1400 ELO level.
 `.trim();
@@ -83,13 +84,14 @@ export default function App() {
   const resultRef = useRef("");
   const sourceRef = useRef(null);
 
-  const onMoveFn = async (history) => {
+  const onMoveFn = async (history, fen) => {
     resultRef.current = "";
     if (!process.env.REACT_APP_OPENAI_API_KEY) {
       setExplanation("WARN: REACT_APP_OPENAI_API_KEY required");
       return;
     }
 
+    // console.log(`Last Move:\n${history[history.length - 1]}\n\nGame:\n${history}\n\nFEN:\n${fen}`)
     let url = "https://api.openai.com/v1/chat/completions";
     let data = {
       model: "gpt-3.5-turbo",
@@ -101,7 +103,7 @@ export default function App() {
         },
         {
           "role": "user",
-          "content": `Game:\n${history}`
+          "content": `Last Move:\n${history[history.length - 1]}\n\nGame:\n${history}\n\nFEN:\n${fen}`
         }
       ],
       stream: true,
