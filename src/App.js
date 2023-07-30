@@ -10,6 +10,24 @@ function Board({ onMoveFn = (history) => { }}) {
 
   const game = React.useRef(new Chess());
 
+  const squareStyling = (history) => {
+    const sourceSquare = history.length && history[history.length - 1].from;
+    const targetSquare = history.length && history[history.length - 1].to;
+
+    return {
+      ...(history.length && {
+        [sourceSquare]: {
+          backgroundColor: "rgba(255, 255, 0, 0.4)"
+        }
+      }),
+      ...(history.length && {
+        [targetSquare]: {
+          backgroundColor: "rgba(255, 255, 0, 0.4)"
+        }
+      })
+    };
+  };
+
   const onDrop = ({ sourceSquare, targetSquare }) => {
     try {
       game.current.move({
@@ -33,7 +51,7 @@ function Board({ onMoveFn = (history) => { }}) {
   return (
     <Chessboard
       id="board"
-      width={400}
+      width={300}
       position={fen}
       onDrop={onDrop}
       boardStyle={{}}
@@ -45,9 +63,18 @@ function Board({ onMoveFn = (history) => { }}) {
 }
 
 // TODO: more structure on expected outputs. e.g. plans, threats, alternatives
-// TODO: give it engine evals
+// TODO: give it engine evals and current position
+//
+// Answer the following questions with each answer on a new line
+// * Is there theory for the last move? If so, what is it?
+// * What is the idea behind the last move?
+// * What are the key threats to consider given the last move? Answer very concisely
+// * What is the best idea for our next move?
 const sysPrompt = `
-Your task is to help explain what is going on in a given chess game.
+Your task is to help explain the last move in a given chess game.
+Do not explain the previous moves in the game; focus only on the last move.
+Explain concisely in no more than 4 sentences.
+Do not reiterate what the last move was; just immediately explain the idea behind it.
 Explain at a 1400 ELO level.
 `.trim();
 
@@ -105,29 +132,12 @@ export default function App() {
     source.stream();
   };
 
-  // TODO: fix styles. espcially for text
   return (
-    <div>
-      <Board onMoveFn={onMoveFn}/>
-      <div>{explanation}</div>
+    <div className="h-screen flex justify-center items-center">
+      <div className="flex items-start">
+        <Board onMoveFn={onMoveFn}/>
+        <div className="px-5 w-[600px] max-h-[600px] overflow-auto">{explanation}</div>
+      </div>
     </div>
   )
 }
-
-const squareStyling = (history) => {
-  const sourceSquare = history.length && history[history.length - 1].from;
-  const targetSquare = history.length && history[history.length - 1].to;
-
-  return {
-    ...(history.length && {
-      [sourceSquare]: {
-        backgroundColor: "rgba(255, 255, 0, 0.4)"
-      }
-    }),
-    ...(history.length && {
-      [targetSquare]: {
-        backgroundColor: "rgba(255, 255, 0, 0.4)"
-      }
-    })
-  };
-};
