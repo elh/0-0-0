@@ -3,7 +3,7 @@ import { Chess } from "chess.js";
 import Chessboard from "chessboardjsx";
 import { SSE } from "sse.js";
 
-function Board({ onMoveFn = (history, fen) => { }}) {
+function Board({ onMoveFn = (game) => { }}) {
   const [fen, setFen] = React.useState("start");
   const [dropSquareStyle, setDropSquareStyle] = React.useState({});
   const [squareStyles, setSquareStyles] = React.useState({});
@@ -41,7 +41,7 @@ function Board({ onMoveFn = (history, fen) => { }}) {
 
     setFen(game.current.fen());
     setSquareStyles(squareStyling(game.current.history({ verbose: true })))
-    onMoveFn(game.current.history(), game.current.fen());
+    onMoveFn(game.current);
   };
 
   const onDragOverSquare = _ => {
@@ -62,15 +62,15 @@ function Board({ onMoveFn = (history, fen) => { }}) {
   )
 }
 
-// TODO: give it engine evals and current position
+// TODO: give it engine evaluation and moves
 //
+// Consider more structure on expected outputs. e.g. plans, threats, alternatives
+// e.g.
 // Answer the following questions with each answer on a new line
 // * Is there theory for the last move? If so, what is it?
 // * What is the idea behind the last move?
 // * What are the key threats to consider given the last move? Answer very concisely
 // * What is the best idea for our next move?
-//
-// consider more structure on expected outputs. e.g. plans, threats, alternatives
 const sysPrompt = `
 Explain the idea behind the most last move in a given chess game.
 
@@ -81,15 +81,20 @@ Explain briefly the key idea behind the move and if this is a good move.
 Explain at a 1800 ELO level.
 `.trim();
 
-function humPrompt(history, fen) {
+// FEN v. PGN?
+function humPrompt(game) {
+  const lastTurn = game.turn() === "w" ? "Black" : "White"; // note this is flipped
+  const pgn = game.pgn();
+  const fen = game.fen();
+  const history = game.history();
   return `
 Last Move:
-${history[history.length - 1]}
+${lastTurn} played ${history[history.length - 1]}
 
-Game:
-${history}
+PGN:
+${pgn}
 
-FEN:
+Board:
 ${fen}
 `.trim();
 }
@@ -102,14 +107,13 @@ export default function App() {
   const resultRef = useRef("");
   const sourceRef = useRef(null);
 
-  const onMoveFn = async (history, fen) => {
+  const onMoveFn = async (game) => {
     resultRef.current = "";
     if (!process.env.REACT_APP_OPENAI_API_KEY) {
       setExplanation("WARN: REACT_APP_OPENAI_API_KEY required");
       return;
     }
 
-    // console.log(`Last Move:\n${history[history.length - 1]}\n\nGame:\n${history}\n\nFEN:\n${fen}`)
     let url = "https://api.openai.com/v1/chat/completions";
     let data = {
       model: gptModel,
@@ -121,7 +125,7 @@ export default function App() {
         },
         {
           "role": "user",
-          "content": humPrompt(history, fen)
+          "content": humPrompt(game)
         }
       ],
       stream: true,
