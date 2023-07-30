@@ -62,7 +62,6 @@ function Board({ onMoveFn = (history, fen) => { }}) {
   )
 }
 
-// TODO: more structure on expected outputs. e.g. plans, threats, alternatives
 // TODO: give it engine evals and current position
 //
 // Answer the following questions with each answer on a new line
@@ -70,14 +69,33 @@ function Board({ onMoveFn = (history, fen) => { }}) {
 // * What is the idea behind the last move?
 // * What are the key threats to consider given the last move? Answer very concisely
 // * What is the best idea for our next move?
+//
+// consider more structure on expected outputs. e.g. plans, threats, alternatives
 const sysPrompt = `
-Your task is to help explain the last move in a given chess game.
-Do not explain the previous moves in the game; focus only on the last move.
-Explain concisely in no more than 4 sentences.
+Explain the idea behind the most last move in a given chess game.
+
+Do not explain the previous moves in the game; focus only on this current move.
+Do not redundantly reiterate just what the move was; instead immediately explain the idea behind it. Get to the point. Do not waste words like "The last move was the knight move e4"; Instead just explain "e4 attacks the queen and ..."
+Explain concisely in no more than 5 sentences.
 Explain briefly the key idea behind the move and if this is a good move.
-Do not reiterate what the last move was; just immediately explain the idea behind it.
-Explain at a 1400 ELO level.
+Explain at a 1800 ELO level.
 `.trim();
+
+function humPrompt(history, fen) {
+  return `
+Last Move:
+${history[history.length - 1]}
+
+Game:
+${history}
+
+FEN:
+${fen}
+`.trim();
+}
+
+const gptModel = "gpt-4";
+const gptTemperature = 0.7;
 
 export default function App() {
   const [explanation, setExplanation] = React.useState("");
@@ -94,8 +112,8 @@ export default function App() {
     // console.log(`Last Move:\n${history[history.length - 1]}\n\nGame:\n${history}\n\nFEN:\n${fen}`)
     let url = "https://api.openai.com/v1/chat/completions";
     let data = {
-      model: "gpt-3.5-turbo",
-      temperature: 0.7,
+      model: gptModel,
+      temperature: gptTemperature,
       messages: [
         {
           "role": "system",
@@ -103,7 +121,7 @@ export default function App() {
         },
         {
           "role": "user",
-          "content": `Last Move:\n${history[history.length - 1]}\n\nGame:\n${history}\n\nFEN:\n${fen}`
+          "content": humPrompt(history, fen)
         }
       ],
       stream: true,
@@ -143,7 +161,15 @@ export default function App() {
     <div className="h-screen flex justify-center items-center">
       <div className="flex items-start">
         <Board onMoveFn={onMoveFn}/>
-        <div className="px-5 w-[600px] max-h-[600px] overflow-auto">{explanation}</div>
+        <div className="px-8 w-[600px] max-h-[600px] overflow-auto">
+          { explanation
+            ? <div>
+                <div className="font-bold">{gptModel} says</div>
+                <div>{explanation}</div>
+              </div>
+            : "Make a move."
+          }
+        </div>
       </div>
     </div>
   )
