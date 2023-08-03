@@ -6,7 +6,6 @@ import GithubMark from './assets/github-mark.png';
 
 // TODO:
 // Take OPENAI token on the front end
-// handle game over in "Play"
 
 function Board({ fen, lastMove, onDropFn = ({ sourceSquare, targetSquare }) => { } }) {
   const squareStyling = (lastMove) => {
@@ -221,6 +220,7 @@ function Play() {
   const [fen, setFen] = React.useState("start");
   const [lastMove, setLastMove] = React.useState(null);
 
+  const [gameOver, setGameOver] = React.useState(false);
   const [invalidAIMove, setInvalidAIMove] = React.useState(false);
 
   const playAIMove = (resp) => {
@@ -243,6 +243,9 @@ function Play() {
     setFen(gameRef.current.fen());
     const lastMoveFromHistory = gameRef.current.history({ verbose: true }).pop();
     setLastMove({sourceSquare: lastMoveFromHistory.from, targetSquare: lastMoveFromHistory.to});
+    if (gameRef.current.isGameOver()) {
+      setGameOver(true);
+    }
   };
 
   const generateAIMove = () => {
@@ -305,6 +308,9 @@ function Play() {
     if (gameRef.current.turn() === "b") {
       return;
     }
+    if (gameOver) {
+      return;
+    }
 
     try {
       gameRef.current.move({
@@ -319,7 +325,11 @@ function Play() {
     setFen(gameRef.current.fen());
     setLastMove({ sourceSquare, targetSquare });
 
-    generateAIMove();
+    if (gameRef.current.isGameOver()) {
+      setGameOver(true);
+    } else {
+      generateAIMove();
+    }
   };
 
   return (
@@ -335,17 +345,33 @@ function Play() {
             ? <div>
                 <div className="font-bold">{gptModel} is thinking...</div>
                 <div>{resp}</div>
-                { invalidAIMove
-                  ? <div className="pt-8">
-                      <div className="text-red-600">Invalid move :(</div>
-                      <button
-                        type="button"
-                        className="mt-2 px-2 py-1 text-sm text-center text-red-600 border border-red-600 rounded-md hover:bg-gray-100"
-                        onClick={() => generateAIMove()}>
-                        Try Again
-                      </button>
-                    </div>
-                  : null
+                { invalidAIMove &&
+                  <div className="pt-8">
+                    <div className="text-red-600">Invalid move :(</div>
+                    <button
+                      type="button"
+                      className="mt-2 px-2 py-1 text-sm text-center text-red-600 border border-red-600 rounded-md hover:bg-gray-100"
+                      onClick={() => generateAIMove()}>
+                      Try Again
+                    </button>
+                  </div>
+                }
+                { gameOver &&
+                  <div className="pt-8">
+                    <div className="font-bold">Game Over</div>
+                    <button
+                      type="button"
+                      className="mt-2 px-2 py-1 text-sm text-center text-gray-600 border border-gray-600 rounded-md hover:bg-gray-100"
+                      onClick={() => {
+                        gameRef.current.reset();
+                        setFen(gameRef.current.fen());
+                        setGameOver(false);
+                        setLastMove(null);
+                        setResp("");
+                      }}>
+                      Play Again!
+                    </button>
+                  </div>
                 }
               </div>
             : <div>
@@ -368,7 +394,10 @@ export default function App() {
           type="button"
           className="mx-2 px-2 py-1 text-xs text-center text-gray-600 border border-gray-600 rounded-md hover:bg-gray-100"
           onClick={() => {
-            setMode(mode === "play" ? "analyze" : "play");
+            const confirm = window.confirm("Are you sure? You will lose current game progress.");
+            if (confirm) {
+              setMode(mode === "play" ? "analyze" : "play");
+            }
           }}>
             Switch to {mode === "play" ? "Analyze" : "Play"} mode ↗
         </button>
