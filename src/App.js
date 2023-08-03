@@ -4,10 +4,7 @@ import Chessboard from "chessboardjsx";
 import { SSE } from "sse.js";
 import GithubMark from './assets/github-mark.png';
 
-// TODO:
-// Take OPENAI token on the front end
-
-function Board({ fen, lastMove, onDropFn = ({ sourceSquare, targetSquare }) => { } }) {
+function Board({ disabled, fen, lastMove, onDropFn = ({ sourceSquare, targetSquare }) => { } }) {
   const squareStyling = (lastMove) => {
     if (!lastMove) {
       return {};
@@ -32,6 +29,7 @@ function Board({ fen, lastMove, onDropFn = ({ sourceSquare, targetSquare }) => {
       boardStyle={{}}
       squareStyles={squareStyling(lastMove)}
       dropSquareStyle={{ boxShadow: "inset 0 0 1px 2px rgb(255, 255, 0)" }}
+      allowDrag={() => !disabled}
     />
   )
 }
@@ -75,7 +73,8 @@ ${fen}
 const gptModel = "gpt-4";
 const gptTemperature = 0.7;
 
-function Analyze() {
+// Analyze mode: play out a game and GPT will explain moves.
+function Analyze({ openAIAPIKey }) {
   // LLM generation
   const [explanation, setExplanation] = React.useState("");
   const respRef = useRef("");
@@ -101,8 +100,8 @@ function Analyze() {
     setLastMove({ sourceSquare, targetSquare });
 
     respRef.current = "";
-    if (!process.env.REACT_APP_OPENAI_API_KEY) {
-      setExplanation("WARN: REACT_APP_OPENAI_API_KEY required");
+    if (!openAIAPIKey) {
+      setExplanation("OpenAI API Key is required");
       return;
     }
 
@@ -131,7 +130,7 @@ function Analyze() {
     sourceRef.current = new SSE(url, {
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`,
+        Authorization: `Bearer ${openAIAPIKey}`,
       },
       method: "POST",
       payload: JSON.stringify(data),
@@ -160,6 +159,7 @@ function Analyze() {
           fen={fen}
           lastMove={lastMove}
           onDropFn={onDropFn}
+          disabled={openAIAPIKey === ""}
         />
         <div className="px-8 w-[600px] max-h-[600px] overflow-auto">
           { explanation
@@ -208,8 +208,9 @@ ${fen}
 `.trim();
 }
 
-// human playing white and GPT playing black
-function Play() {
+// Play mode: play against GPT
+// Human plays white and GPT plays black
+function Play({ openAIAPIKey }) {
   // LLM generation
   const [resp, setResp] = React.useState("");
   const respRef = useRef("");
@@ -251,8 +252,8 @@ function Play() {
   const generateAIMove = () => {
     setInvalidAIMove(false);
     respRef.current = "";
-    if (!process.env.REACT_APP_OPENAI_API_KEY) {
-      setResp("WARN: REACT_APP_OPENAI_API_KEY required");
+    if (!openAIAPIKey) {
+      setResp("OpenAI API Key is required");
       return;
     }
 
@@ -281,7 +282,7 @@ function Play() {
     sourceRef.current = new SSE(url, {
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`,
+        Authorization: `Bearer ${openAIAPIKey}`,
       },
       method: "POST",
       payload: JSON.stringify(data),
@@ -339,6 +340,7 @@ function Play() {
           fen={fen}
           lastMove={lastMove}
           onDropFn={onDropFn}
+          disabled={openAIAPIKey === ""}
         />
         <div className="px-8 w-[600px] max-h-[600px] overflow-auto">
           { resp
@@ -384,8 +386,10 @@ function Play() {
   )
 }
 
+// If REACT_APP_OPENAI_API_KEY env var is set, use it. else, it must be provided in app bring-your-own-key.
 export default function App() {
   const [mode, setMode] = React.useState("play");
+  const [openAIAPIKey, setOpenAIAPIKey] = React.useState(process.env.REACT_APP_OPENAI_API_KEY ? process.env.REACT_APP_OPENAI_API_KEY : "");
 
   return (
     <div>
@@ -402,13 +406,27 @@ export default function App() {
             Switch to {mode === "play" ? "Analyze" : "Play"} mode ↗
         </button>
         <a href="https://github.com/elh/0-0-0">
-          <img src={GithubMark} className="w-6 mx-1" />
+          <img src={GithubMark} className="w-6 mx-1" alt="Github link to elh" />
         </a>
       </div>
 
+      {/* On change, save this locally */}
+      { openAIAPIKey === "" &&
+        <div class="flex items-center justify-center mb-8">
+          <label for="small-input" class="text-xs font-medium text-red-600">OpenAI API Key*</label>
+          <input type="password" id="small-input" class="w-96 mx-2 px-2 py-1 text-xs text-gray-600 border border-red-600 rounded-md" onBlur={
+            (e) => {
+              if (e.target.value !== "") {
+                setOpenAIAPIKey(e.target.value);
+              }
+            }
+          } />
+        </div>
+      }
+
       { mode === "play"
-        ? <Play />
-        : <Analyze />
+        ? <Play openAIAPIKey={openAIAPIKey} />
+        : <Analyze openAIAPIKey={openAIAPIKey} />
       }
     </div>
   )
