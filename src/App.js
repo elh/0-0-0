@@ -153,7 +153,7 @@ function Analyze({ openAIAPIKey }) {
   };
 
   return (
-    <div className="h-full flex justify-center items-center">
+    <div className="flex justify-center items-center">
       <div className="flex items-start">
         <Board
           fen={fen}
@@ -334,7 +334,7 @@ function Play({ openAIAPIKey }) {
   };
 
   return (
-    <div className="h-full flex justify-center items-center">
+    <div className="flex justify-center items-center">
       <div className="flex items-start">
         <Board
           fen={fen}
@@ -412,7 +412,7 @@ export default function App() {
 
       {/* On change, save this locally */}
       { openAIAPIKey === "" &&
-        <div class="flex items-center justify-center mb-8">
+        <div class="flex items-center justify-center mt-4">
           <label for="small-input" class="text-xs font-medium text-red-600">OpenAI API Key*</label>
           <input type="password" id="small-input" class="w-96 mx-2 px-2 py-1 text-xs text-gray-600 border border-red-600 rounded-md" onBlur={
             (e) => {
@@ -424,10 +424,12 @@ export default function App() {
         </div>
       }
 
-      { mode === "play"
-        ? <Play openAIAPIKey={openAIAPIKey} />
-        : <Analyze openAIAPIKey={openAIAPIKey} />
-      }
+      <div class="mt-20">
+        { mode === "play"
+          ? <Play openAIAPIKey={openAIAPIKey} />
+          : <Analyze openAIAPIKey={openAIAPIKey} />
+        }
+      </div>
     </div>
   )
 }

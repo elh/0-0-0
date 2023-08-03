@@ -3,7 +3,7 @@
 Play chess against GPT-4 in your browser. Have GPT-4 analyze positions and explain them in natural language.
 
 <p align="center">
-    <img width="95%" alt="Play GPT" src="https://github.com/elh/0-0-0/assets/1035393/093fe235-c140-4373-a568-5f5ef33899ec">
+    <img width="95%" alt="Play GPT" src="screenshots/screenshot.png">
 </p>
 
 ### Why?
@@ -12,7 +12,7 @@ As a bad chess player, one of the barriers to improving is the effort required i
 
 I am also generally interested in less obvious deep integrations of LLM's within applications.
 
-Now, the unfortunate reality is that GPT-4 at the moment is pretty bad at chess often proposing invalid moves and obvious blunders. From my very limited testing, good performance is easily explained by pre-training on theory. So, this will be a fun and easy way to see how it improves over time in this high complexity task.
+Now, the unfortunate reality is that GPT-4 at the moment is pretty bad at chess often proposing invalid moves and obvious blunders. From my very limited testing, good performance is easily explained by regurgitating pre-trained theory. So, this will be a fun and easy way to see how it improves over time in this high complexity task.
 
 ### Improvements
 
