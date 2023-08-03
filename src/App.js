@@ -3,61 +3,90 @@ import { Chess } from "chess.js";
 import Chessboard from "chessboardjsx";
 import { SSE } from "sse.js";
 
-function Board({ game, onMoveFn = (game) => { }}) {
-  // const [fen, setFen] = React.useState("start");
-  const [dropSquareStyle, setDropSquareStyle] = React.useState({});
-  const [squareStyles, setSquareStyles] = React.useState({});
+function Board({ fen, lastMove, onDropFn = ({ sourceSquare, targetSquare }) => { } }) {
+  // const [dropSquareStyle, setDropSquareStyle] = React.useState({});
+  // const [squareStyles, setSquareStyles] = React.useState({});
 
-  let gameRef = React.useRef(game);
+  // const squareStyling = (history) => {
+  //   const sourceSquare = history.length && history[history.length - 1].from;
+  //   const targetSquare = history.length && history[history.length - 1].to;
 
-  const squareStyling = (history) => {
-    const sourceSquare = history.length && history[history.length - 1].from;
-    const targetSquare = history.length && history[history.length - 1].to;
+  //   return {
+  //     ...(history.length && {
+  //       [sourceSquare]: {
+  //         backgroundColor: "rgba(255, 255, 0, 0.4)"
+  //       }
+  //     }),
+  //     ...(history.length && {
+  //       [targetSquare]: {
+  //         backgroundColor: "rgba(255, 255, 0, 0.4)"
+  //       }
+  //     })
+  //   };
+  // };
 
-    return {
-      ...(history.length && {
-        [sourceSquare]: {
-          backgroundColor: "rgba(255, 255, 0, 0.4)"
-        }
-      }),
-      ...(history.length && {
-        [targetSquare]: {
-          backgroundColor: "rgba(255, 255, 0, 0.4)"
-        }
-      })
-    };
-  };
-
-  const onDrop = ({ sourceSquare, targetSquare }) => {
-    try {
-      gameRef.current.move({
-        from: sourceSquare,
-        to: targetSquare,
-        promotion: "q" // warn: always promote to a queen
-      });
-    } catch (error) {
-      return;
+  const squareStyling = (lastMove) => {
+    if (!lastMove) {
+      return {};
     }
 
-    // setFen(gameRef.current.fen());
-    setSquareStyles(squareStyling(gameRef.current.history({ verbose: true })))
-    onMoveFn(gameRef.current);
+    return {
+      [lastMove.sourceSquare]: {
+        backgroundColor: "rgba(255, 255, 0, 0.4)"
+      },
+      [lastMove.targetSquare]: {
+        backgroundColor: "rgba(255, 255, 0, 0.4)"
+      }
+    };
+
+    // const sourceSquare = lastMove.from;
+    // const targetSquare = lastMove.to;
+
+    // return {
+    //   ...(lastMove && {
+    //     [sourceSquare]: {
+    //       backgroundColor: "rgba(255, 255, 0, 0.4)"
+    //     }
+    //   }),
+    //   ...(lastMove && {
+    //     [targetSquare]: {
+    //       backgroundColor: "rgba(255, 255, 0, 0.4)"
+    //     }
+    //   })
+    // };
   };
 
-  const onDragOverSquare = _ => {
-    setDropSquareStyle({ boxShadow: "inset 0 0 1px 2px rgb(255, 255, 0)" })
-  };
+  // const onDrop = ({ sourceSquare, targetSquare }) => {
+  //   try {
+  //     gameRef.current.move({
+  //       from: sourceSquare,
+  //       to: targetSquare,
+  //       promotion: "q" // warn: always promote to a queen
+  //     });
+  //   } catch (error) {
+  //     return;
+  //   }
+
+  //   // setFen(gameRef.current.fen());
+  //   setSquareStyles(squareStyling(gameRef.current.history({ verbose: true })))
+  //   onMoveFn(gameRef.current);
+  // };
+
+  // const onDragOverSquare = _ => {
+  //   setDropSquareStyle({ boxShadow: "inset 0 0 1px 2px rgb(255, 255, 0)" })
+  // };
 
   return (
     <Chessboard
       id="board"
       width={300}
-      position={gameRef.current.fen()}
-      onDrop={onDrop}
+      position={fen}
+      onDrop={onDropFn}
       boardStyle={{}}
-      squareStyles={squareStyles}
-      dropSquareStyle={dropSquareStyle}
-      onDragOverSquare={onDragOverSquare}
+      squareStyles={squareStyling(lastMove)}
+      // dropSquareStyle={dropSquareStyle}
+      dropSquareStyle={{ boxShadow: "inset 0 0 1px 2px rgb(255, 255, 0)" }}
+      // onDragOverSquare={onDragOverSquare}
     />
   )
 }
@@ -103,11 +132,30 @@ const gptModel = "gpt-3.5-turbo";
 const gptTemperature = 0.7;
 
 function Analyze() {
+  // LLM generation
   const [explanation, setExplanation] = React.useState("");
   const respRef = useRef("");
   const sourceRef = useRef(null);
 
-  const onMoveFn = async (game) => {
+  // the game
+  const gameRef = useRef(new Chess());
+  const [fen, setFen] = React.useState("start");
+  const [lastMove, setLastMove] = React.useState(null);
+
+  const onDropFn = ({ sourceSquare, targetSquare }) => {
+    try {
+      gameRef.current.move({
+        from: sourceSquare,
+        to: targetSquare,
+        promotion: "q" // warn: always promote to a queen
+      });
+    } catch (error) {
+      return;
+    }
+
+    setFen(gameRef.current.fen());
+    setLastMove({ sourceSquare, targetSquare });
+
     respRef.current = "";
     if (!process.env.REACT_APP_OPENAI_API_KEY) {
       setExplanation("WARN: REACT_APP_OPENAI_API_KEY required");
@@ -125,7 +173,7 @@ function Analyze() {
         },
         {
           "role": "user",
-          "content": analyzeHumPrompt(game)
+          "content": analyzeHumPrompt(gameRef.current)
         }
       ],
       stream: true,
@@ -164,7 +212,11 @@ function Analyze() {
   return (
     <div className="h-screen flex justify-center items-center">
       <div className="flex items-start">
-        <Board game={new Chess()} onMoveFn={onMoveFn}/>
+        <Board
+          fen={fen}
+          lastMove={lastMove}
+          onDropFn={onDropFn}
+        />
         <div className="px-8 w-[600px] max-h-[600px] overflow-auto">
           { explanation
             ? <div>
@@ -327,7 +379,7 @@ function Play() {
 
 export default function App() {
   return (
-    // <Analyze />
-    <Play />
+    <Analyze />
+    // <Play />
   )
 }
