@@ -110,7 +110,6 @@ Explain briefly the key idea behind the move and if this is a good move.
 Explain at a 1800 ELO level.
 `.trim();
 
-// FEN v. PGN?
 function analyzeHumPrompt(game) {
   const lastTurn = game.turn() === "w" ? "Black" : "White"; // note this is flipped
   const pgn = game.pgn();
@@ -123,7 +122,7 @@ ${lastTurn} played ${history[history.length - 1]}
 PGN:
 ${pgn}
 
-Board:
+FEN:
 ${fen}
 `.trim();
 }
@@ -239,18 +238,15 @@ function Analyze() {
 // TODO: remove be consise
 const playSysPrompt = `
 Play the best chess move.
-Let's think step by step and write out our reasoning for the best move.
+Let's think step by step and write out our reasoning and then finally write the best move by itself on the final line.
 
-Follow these syntactic rules carefully.
-Finally, return the best move in Standard Algebraic Notation on its own on the last line.
-Return just the move on its own line like "e4"; do not return the full PGN or the turn number. For example, return "d5" instead of "1...d5"
-Do not return the best move in quotes.
-Do not end the the last line with a period after the move
-
-Be very concise. Only think for at most 2 sentences.
+Follow these syntactic rules carefully:
+Write the best move in Standard Algebraic Notation on the last line.
+Do not write the full PGN or the turn number. For example, write "d5" instead of "1...d5"
+Do not write the best move in quotes.
+Do not end the the last line with a period after the move.
 `.trim();
 
-// FEN v. PGN?
 function playHumPrompt(game) {
   const lastTurn = game.turn() === "w" ? "Black" : "White"; // note this is flipped
   const pgn = game.pgn();
@@ -263,45 +259,82 @@ ${lastTurn} played ${history[history.length - 1]}
 PGN:
 ${pgn}
 
-Board:
+FEN:
 ${fen}
 `.trim();
 }
 
 // human playing white and GPT playing black
 function Play() {
-  const [turn, setTurn] = React.useState("white");
+  // LLM generation
   const [resp, setResp] = React.useState("");
-  const [generating, setGenerating] = React.useState(false);
+  // const [generating, setGenerating] = React.useState(false);
   const respRef = useRef("");
   const sourceRef = useRef(null);
-  const gameRef = useRef(new Chess());
 
-  useEffect(() => {
-    if (generating || !resp) {
-      return
-    }
-    console.log(resp)
+  // the game
+  const gameRef = useRef(new Chess());
+  // const [turn, setTurn] = React.useState("white");
+  const [fen, setFen] = React.useState("start");
+  const [lastMove, setLastMove] = React.useState(null);
+
+  // useEffect(() => {
+  //   if (generating || !resp) {
+  //     return
+  //   }
+  //   console.log(resp)
+  //   let move = resp.split(/\s+/).pop();
+  //   console.log("move: " + move)
+  //   // if there is a trailing period after the move, remove it
+  //   if (move.endsWith(".")) {
+  //     move = move.split(".").pop();
+  //   }
+  //   if (move.includes(".")) {
+  //     move = move.split(".").pop();
+  //   }
+  //   console.log("move: " + move)
+  //   gameRef.current.move(move);
+  // }, [generating]);
+
+  const playAIMove = (resp) => {
     let move = resp.split(/\s+/).pop();
     console.log("move: " + move)
-    // if there is a trailing period after the move, remove it
     if (move.endsWith(".")) {
-      move = move.split(".").pop();
+      move = move.slice(0, -1);
     }
+    console.log("move: " + move)
     if (move.includes(".")) {
       move = move.split(".").pop();
     }
     console.log("move: " + move)
-    gameRef.current.move(move);
-  }, [generating]);
 
-  const onMoveFn = async (game) => {
-    if (turn === "black") {
-      setTurn("white");
+    gameRef.current.move(move);
+    setFen(gameRef.current.fen());
+    const lastMoveFromHistory = gameRef.current.history({ verbose: true }).pop();
+    setLastMove({sourceSquare: lastMoveFromHistory.from, targetSquare: lastMoveFromHistory.to});
+  };
+
+
+  const onDropFn = ({ sourceSquare, targetSquare }) => {
+    if (gameRef.current.turn() === "b") {
       return;
     }
-    setTurn("black");
-    setGenerating(true);
+
+    try {
+      gameRef.current.move({
+        from: sourceSquare,
+        to: targetSquare,
+        promotion: "q" // warn: always promote to a queen
+      });
+    } catch (error) {
+      return;
+    }
+
+    setFen(gameRef.current.fen());
+    setLastMove({ sourceSquare, targetSquare });
+
+    // setTurn("black");
+    // setGenerating(true);
 
     respRef.current = "";
     if (!process.env.REACT_APP_OPENAI_API_KEY) {
@@ -320,7 +353,7 @@ function Play() {
         },
         {
           "role": "user",
-          "content": playHumPrompt(game)
+          "content": playHumPrompt(gameRef.current)
         }
       ],
       stream: true,
@@ -349,8 +382,9 @@ function Play() {
           setResp(respRef.current);
         }
       } else {
-        setGenerating(false);
+        // setGenerating(false);
         sourceRef.current.close();
+        playAIMove(respRef.current);
       }
     });
 
@@ -360,7 +394,11 @@ function Play() {
   return (
     <div className="h-screen flex justify-center items-center">
       <div className="flex items-start">
-        <Board game={gameRef.current} onMoveFn={onMoveFn}/>
+        <Board
+          fen={fen}
+          lastMove={lastMove}
+          onDropFn={onDropFn}
+        />
         <div className="px-8 w-[600px] max-h-[600px] overflow-auto">
           { resp
             ? <div>
@@ -379,7 +417,7 @@ function Play() {
 
 export default function App() {
   return (
-    <Analyze />
-    // <Play />
+    // <Analyze />
+    <Play />
   )
 }
