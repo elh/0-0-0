@@ -1,0 +1,9 @@
+{
+  "short_name": "0-0-0 GPT Chess",
+  "name": "0-0-0 GPT Chess",
+  "icons": [],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff"
+}
