@@ -1,30 +1,9 @@
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import { Chess } from "chess.js";
 import Chessboard from "chessboardjsx";
 import { SSE } from "sse.js";
 
 function Board({ fen, lastMove, onDropFn = ({ sourceSquare, targetSquare }) => { } }) {
-  // const [dropSquareStyle, setDropSquareStyle] = React.useState({});
-  // const [squareStyles, setSquareStyles] = React.useState({});
-
-  // const squareStyling = (history) => {
-  //   const sourceSquare = history.length && history[history.length - 1].from;
-  //   const targetSquare = history.length && history[history.length - 1].to;
-
-  //   return {
-  //     ...(history.length && {
-  //       [sourceSquare]: {
-  //         backgroundColor: "rgba(255, 255, 0, 0.4)"
-  //       }
-  //     }),
-  //     ...(history.length && {
-  //       [targetSquare]: {
-  //         backgroundColor: "rgba(255, 255, 0, 0.4)"
-  //       }
-  //     })
-  //   };
-  // };
-
   const squareStyling = (lastMove) => {
     if (!lastMove) {
       return {};
@@ -38,43 +17,7 @@ function Board({ fen, lastMove, onDropFn = ({ sourceSquare, targetSquare }) => {
         backgroundColor: "rgba(255, 255, 0, 0.4)"
       }
     };
-
-    // const sourceSquare = lastMove.from;
-    // const targetSquare = lastMove.to;
-
-    // return {
-    //   ...(lastMove && {
-    //     [sourceSquare]: {
-    //       backgroundColor: "rgba(255, 255, 0, 0.4)"
-    //     }
-    //   }),
-    //   ...(lastMove && {
-    //     [targetSquare]: {
-    //       backgroundColor: "rgba(255, 255, 0, 0.4)"
-    //     }
-    //   })
-    // };
   };
-
-  // const onDrop = ({ sourceSquare, targetSquare }) => {
-  //   try {
-  //     gameRef.current.move({
-  //       from: sourceSquare,
-  //       to: targetSquare,
-  //       promotion: "q" // warn: always promote to a queen
-  //     });
-  //   } catch (error) {
-  //     return;
-  //   }
-
-  //   // setFen(gameRef.current.fen());
-  //   setSquareStyles(squareStyling(gameRef.current.history({ verbose: true })))
-  //   onMoveFn(gameRef.current);
-  // };
-
-  // const onDragOverSquare = _ => {
-  //   setDropSquareStyle({ boxShadow: "inset 0 0 1px 2px rgb(255, 255, 0)" })
-  // };
 
   return (
     <Chessboard
@@ -84,9 +27,7 @@ function Board({ fen, lastMove, onDropFn = ({ sourceSquare, targetSquare }) => {
       onDrop={onDropFn}
       boardStyle={{}}
       squareStyles={squareStyling(lastMove)}
-      // dropSquareStyle={dropSquareStyle}
       dropSquareStyle={{ boxShadow: "inset 0 0 1px 2px rgb(255, 255, 0)" }}
-      // onDragOverSquare={onDragOverSquare}
     />
   )
 }
@@ -235,7 +176,6 @@ function Analyze() {
   )
 }
 
-// TODO: remove be consise
 const playSysPrompt = `
 Play the best chess move.
 Let's think step by step and write out our reasoning and then finally write the best move by itself on the final line.
@@ -268,47 +208,26 @@ ${fen}
 function Play() {
   // LLM generation
   const [resp, setResp] = React.useState("");
-  // const [generating, setGenerating] = React.useState(false);
   const respRef = useRef("");
   const sourceRef = useRef(null);
 
   // the game
   const gameRef = useRef(new Chess());
-  // const [turn, setTurn] = React.useState("white");
   const [fen, setFen] = React.useState("start");
   const [lastMove, setLastMove] = React.useState(null);
 
-  // useEffect(() => {
-  //   if (generating || !resp) {
-  //     return
-  //   }
-  //   console.log(resp)
-  //   let move = resp.split(/\s+/).pop();
-  //   console.log("move: " + move)
-  //   // if there is a trailing period after the move, remove it
-  //   if (move.endsWith(".")) {
-  //     move = move.split(".").pop();
-  //   }
-  //   if (move.includes(".")) {
-  //     move = move.split(".").pop();
-  //   }
-  //   console.log("move: " + move)
-  //   gameRef.current.move(move);
-  // }, [generating]);
-
   const playAIMove = (resp) => {
     let move = resp.split(/\s+/).pop();
-    console.log("move: " + move)
     if (move.endsWith(".")) {
       move = move.slice(0, -1);
     }
-    console.log("move: " + move)
     if (move.includes(".")) {
       move = move.split(".").pop();
     }
-    console.log("move: " + move)
 
+    // TODO: handle invalid moves!
     gameRef.current.move(move);
+
     setFen(gameRef.current.fen());
     const lastMoveFromHistory = gameRef.current.history({ verbose: true }).pop();
     setLastMove({sourceSquare: lastMoveFromHistory.from, targetSquare: lastMoveFromHistory.to});
@@ -332,9 +251,6 @@ function Play() {
 
     setFen(gameRef.current.fen());
     setLastMove({ sourceSquare, targetSquare });
-
-    // setTurn("black");
-    // setGenerating(true);
 
     respRef.current = "";
     if (!process.env.REACT_APP_OPENAI_API_KEY) {
@@ -382,7 +298,6 @@ function Play() {
           setResp(respRef.current);
         }
       } else {
-        // setGenerating(false);
         sourceRef.current.close();
         playAIMove(respRef.current);
       }
