@@ -12,11 +12,12 @@ As a bad chess player, one of the barriers to improving is the effort required i
 
 I am also generally interested in less obvious deep integrations of LLM's within applications.
 
-Now, the unfortunate reality is that GPT-4 at the moment is pretty bad at chess often proposing invalid moves and obvious blunders. From my very limited testing, good performance is easily explained by regurgitating pre-trained theory. So, this will be a fun and easy way to see how it improves over time in this high complexity task.
+Now, the unfortunate reality is that GPT-4 at the moment is pretty bad at chess, often proposing invalid moves and obvious blunders. From my very limited testing, good performance is easily explained by regurgitating pre-trained theory. So, this will be a fun and easy way to see how it improves over time in this high complexity task.
 
 ### Improvements
 
 - [ ] Combine a conventional engine with GPT. Have engine own evaluation of lines and lean on GPT to explain them.
     * This was the original idea but I didn't immediately find a JS engine I wanted to integrate.
-- [ ] Allow chatting with GPT in analysis mode
+- [ ] Chat with GPT in analysis mode
+- [ ] Expose and customize prompts
 - [ ] Load and export games w/ GPT commentary
