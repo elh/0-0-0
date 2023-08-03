@@ -1,14 +1,14 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { Chess } from "chess.js";
 import Chessboard from "chessboardjsx";
 import { SSE } from "sse.js";
 
-function Board({ onMoveFn = (game) => { }}) {
-  const [fen, setFen] = React.useState("start");
+function Board({ game, onMoveFn = (game) => { }}) {
+  // const [fen, setFen] = React.useState("start");
   const [dropSquareStyle, setDropSquareStyle] = React.useState({});
   const [squareStyles, setSquareStyles] = React.useState({});
 
-  const game = React.useRef(new Chess());
+  let gameRef = React.useRef(game);
 
   const squareStyling = (history) => {
     const sourceSquare = history.length && history[history.length - 1].from;
@@ -30,7 +30,7 @@ function Board({ onMoveFn = (game) => { }}) {
 
   const onDrop = ({ sourceSquare, targetSquare }) => {
     try {
-      game.current.move({
+      gameRef.current.move({
         from: sourceSquare,
         to: targetSquare,
         promotion: "q" // warn: always promote to a queen
@@ -39,9 +39,9 @@ function Board({ onMoveFn = (game) => { }}) {
       return;
     }
 
-    setFen(game.current.fen());
-    setSquareStyles(squareStyling(game.current.history({ verbose: true })))
-    onMoveFn(game.current);
+    // setFen(gameRef.current.fen());
+    setSquareStyles(squareStyling(gameRef.current.history({ verbose: true })))
+    onMoveFn(gameRef.current);
   };
 
   const onDragOverSquare = _ => {
@@ -52,7 +52,7 @@ function Board({ onMoveFn = (game) => { }}) {
     <Chessboard
       id="board"
       width={300}
-      position={fen}
+      position={gameRef.current.fen()}
       onDrop={onDrop}
       boardStyle={{}}
       squareStyles={squareStyles}
@@ -71,7 +71,7 @@ function Board({ onMoveFn = (game) => { }}) {
 // * What is the idea behind the last move?
 // * What are the key threats to consider given the last move? Answer very concisely
 // * What is the best idea for our next move?
-const sysPrompt = `
+const analyzeSysPrompt = `
 Explain the idea behind the most last move in a given chess game.
 
 Do not explain the previous moves in the game; focus only on this current move.
@@ -82,7 +82,7 @@ Explain at a 1800 ELO level.
 `.trim();
 
 // FEN v. PGN?
-function humPrompt(game) {
+function analyzeHumPrompt(game) {
   const lastTurn = game.turn() === "w" ? "Black" : "White"; // note this is flipped
   const pgn = game.pgn();
   const fen = game.fen();
@@ -99,16 +99,16 @@ ${fen}
 `.trim();
 }
 
-const gptModel = "gpt-4";
+const gptModel = "gpt-3.5-turbo";
 const gptTemperature = 0.7;
 
-export default function App() {
+function Analyze() {
   const [explanation, setExplanation] = React.useState("");
-  const resultRef = useRef("");
+  const respRef = useRef("");
   const sourceRef = useRef(null);
 
   const onMoveFn = async (game) => {
-    resultRef.current = "";
+    respRef.current = "";
     if (!process.env.REACT_APP_OPENAI_API_KEY) {
       setExplanation("WARN: REACT_APP_OPENAI_API_KEY required");
       return;
@@ -121,11 +121,11 @@ export default function App() {
       messages: [
         {
           "role": "system",
-          "content": sysPrompt
+          "content": analyzeSysPrompt
         },
         {
           "role": "user",
-          "content": humPrompt(game)
+          "content": analyzeHumPrompt(game)
         }
       ],
       stream: true,
@@ -150,8 +150,8 @@ export default function App() {
         let payload = JSON.parse(e.data);
         let text = payload.choices[0].delta.content;
         if (text) {
-          resultRef.current = resultRef.current + text;
-          setExplanation(resultRef.current);
+          respRef.current = respRef.current + text;
+          setExplanation(respRef.current);
         }
       } else {
         sourceRef.current.close();
@@ -164,17 +164,170 @@ export default function App() {
   return (
     <div className="h-screen flex justify-center items-center">
       <div className="flex items-start">
-        <Board onMoveFn={onMoveFn}/>
+        <Board game={new Chess()} onMoveFn={onMoveFn}/>
         <div className="px-8 w-[600px] max-h-[600px] overflow-auto">
           { explanation
             ? <div>
                 <div className="font-bold">{gptModel} says</div>
                 <div>{explanation}</div>
               </div>
-            : "Make a move."
+            : <div>
+                <span>Make a move on the board.</span>
+                {/* <span>Make a move on the board or load a position with FEN</span>
+                <input type="text" id="fen" class="border border-gray-500 text-sm rounded-md w-full p-1 mt-6" placeholder="8/6pk/6rp/p4Q2/1bp4P/3qB1P1/5P2/2R3K1 w - - 1 49" required />
+                <button type="button" class="mt-2 px-3 py-2 text-sm text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800">Load</button> */}
+              </div>
           }
         </div>
       </div>
     </div>
+  )
+}
+
+// TODO: remove be consise
+const playSysPrompt = `
+Play the best chess move.
+Let's think step by step and write out our reasoning for the best move.
+
+Follow these syntactic rules carefully.
+Finally, return the best move in Standard Algebraic Notation on its own on the last line.
+Return just the move on its own line like "e4"; do not return the full PGN or the turn number. For example, return "d5" instead of "1...d5"
+Do not return the best move in quotes.
+Do not end the the last line with a period after the move
+
+Be very concise. Only think for at most 2 sentences.
+`.trim();
+
+// FEN v. PGN?
+function playHumPrompt(game) {
+  const lastTurn = game.turn() === "w" ? "Black" : "White"; // note this is flipped
+  const pgn = game.pgn();
+  const fen = game.fen();
+  const history = game.history();
+  return `
+Last Move:
+${lastTurn} played ${history[history.length - 1]}
+
+PGN:
+${pgn}
+
+Board:
+${fen}
+`.trim();
+}
+
+// human playing white and GPT playing black
+function Play() {
+  const [turn, setTurn] = React.useState("white");
+  const [resp, setResp] = React.useState("");
+  const [generating, setGenerating] = React.useState(false);
+  const respRef = useRef("");
+  const sourceRef = useRef(null);
+  const gameRef = useRef(new Chess());
+
+  useEffect(() => {
+    if (generating || !resp) {
+      return
+    }
+    console.log(resp)
+    let move = resp.split(/\s+/).pop();
+    console.log("move: " + move)
+    // if there is a trailing period after the move, remove it
+    if (move.endsWith(".")) {
+      move = move.split(".").pop();
+    }
+    if (move.includes(".")) {
+      move = move.split(".").pop();
+    }
+    console.log("move: " + move)
+    gameRef.current.move(move);
+  }, [generating]);
+
+  const onMoveFn = async (game) => {
+    if (turn === "black") {
+      setTurn("white");
+      return;
+    }
+    setTurn("black");
+    setGenerating(true);
+
+    respRef.current = "";
+    if (!process.env.REACT_APP_OPENAI_API_KEY) {
+      setResp("WARN: REACT_APP_OPENAI_API_KEY required");
+      return;
+    }
+
+    let url = "https://api.openai.com/v1/chat/completions";
+    let data = {
+      model: gptModel,
+      temperature: gptTemperature,
+      messages: [
+        {
+          "role": "system",
+          "content": playSysPrompt
+        },
+        {
+          "role": "user",
+          "content": playHumPrompt(game)
+        }
+      ],
+      stream: true,
+    };
+
+    // kill current stream if it exists
+    if (sourceRef.current) {
+      sourceRef.current.close();
+    }
+
+    sourceRef.current = new SSE(url, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`,
+      },
+      method: "POST",
+      payload: JSON.stringify(data),
+    });
+
+    sourceRef.current.addEventListener("message", (e) => {
+      if (e.data !== "[DONE]") {
+        let payload = JSON.parse(e.data);
+        let text = payload.choices[0].delta.content;
+        if (text) {
+          respRef.current = respRef.current + text;
+          setResp(respRef.current);
+        }
+      } else {
+        setGenerating(false);
+        sourceRef.current.close();
+      }
+    });
+
+    sourceRef.current.stream();
+  };
+
+  return (
+    <div className="h-screen flex justify-center items-center">
+      <div className="flex items-start">
+        <Board game={gameRef.current} onMoveFn={onMoveFn}/>
+        <div className="px-8 w-[600px] max-h-[600px] overflow-auto">
+          { resp
+            ? <div>
+                <div className="font-bold">{gptModel} is thinking...</div>
+                <div>{resp}</div>
+              </div>
+            : <div>
+                <span>Start a game by making a move.</span>
+              </div>
+          }
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function App() {
+  return (
+    // <Analyze />
+    <Play />
   )
 }

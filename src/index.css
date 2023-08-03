@@ -8,4 +8,5 @@
 html {
   font-size: 12px;
   font-family: 'Inter', sans-serif;
+  white-space: pre-wrap;
 }
