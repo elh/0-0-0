@@ -2,6 +2,11 @@ import React, { useRef } from "react";
 import { Chess } from "chess.js";
 import Chessboard from "chessboardjsx";
 import { SSE } from "sse.js";
+import GithubMark from './assets/github-mark.png';
+
+// TODO:
+// Take OPENAI token on the front end
+// handle game over in "Play"
 
 function Board({ fen, lastMove, onDropFn = ({ sourceSquare, targetSquare }) => { } }) {
   const squareStyling = (lastMove) => {
@@ -48,7 +53,7 @@ Do not explain the previous moves in the game; focus only on this current move.
 Do not redundantly reiterate just what the move was; instead immediately explain the idea behind it. Get to the point. Do not waste words like "The last move was the knight move e4"; Instead just explain "e4 attacks the queen and ..."
 Explain concisely in no more than 5 sentences.
 Explain briefly the key idea behind the move and if this is a good move.
-Explain at a 1800 ELO level.
+Explain at a 2000 ELO level.
 `.trim();
 
 function analyzeHumPrompt(game) {
@@ -68,7 +73,7 @@ ${fen}
 `.trim();
 }
 
-const gptModel = "gpt-3.5-turbo";
+const gptModel = "gpt-4";
 const gptTemperature = 0.7;
 
 function Analyze() {
@@ -150,7 +155,7 @@ function Analyze() {
   };
 
   return (
-    <div className="h-screen flex justify-center items-center">
+    <div className="h-full flex justify-center items-center">
       <div className="flex items-start">
         <Board
           fen={fen}
@@ -164,7 +169,7 @@ function Analyze() {
                 <div>{explanation}</div>
               </div>
             : <div>
-                <span>Make a move on the board.</span>
+                <span>Make moves on the board for GPT to analyze.</span>
                 {/* <span>Make a move on the board or load a position with FEN</span>
                 <input type="text" id="fen" class="border border-gray-500 text-sm rounded-md w-full p-1 mt-6" placeholder="8/6pk/6rp/p4Q2/1bp4P/3qB1P1/5P2/2R3K1 w - - 1 49" required />
                 <button type="button" class="mt-2 px-3 py-2 text-sm text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800">Load</button> */}
@@ -318,7 +323,7 @@ function Play() {
   };
 
   return (
-    <div className="h-screen flex justify-center items-center">
+    <div className="h-full flex justify-center items-center">
       <div className="flex items-start">
         <Board
           fen={fen}
@@ -344,7 +349,7 @@ function Play() {
                 }
               </div>
             : <div>
-                <span>Start a game by making a move.</span>
+                <span>Start a game against GPT by making a move.</span>
               </div>
           }
         </div>
@@ -354,8 +359,28 @@ function Play() {
 }
 
 export default function App() {
+  const [mode, setMode] = React.useState("play");
+
   return (
-    // <Analyze />
-    <Play />
+    <div>
+      <div class="absolute top-4 right-4 flex items-center">
+        <button
+          type="button"
+          className="mx-2 px-2 py-1 text-xs text-center text-gray-600 border border-gray-600 rounded-md hover:bg-gray-100"
+          onClick={() => {
+            setMode(mode === "play" ? "analyze" : "play");
+          }}>
+            Switch to {mode === "play" ? "Analyze" : "Play"} mode ↗
+        </button>
+        <a href="https://github.com/elh/0-0-0">
+          <img src={GithubMark} className="w-6 mx-1" />
+        </a>
+      </div>
+
+      { mode === "play"
+        ? <Play />
+        : <Analyze />
+      }
+    </div>
   )
 }
