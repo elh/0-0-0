@@ -216,6 +216,8 @@ function Play() {
   const [fen, setFen] = React.useState("start");
   const [lastMove, setLastMove] = React.useState(null);
 
+  const [invalidAIMove, setInvalidAIMove] = React.useState(false);
+
   const playAIMove = (resp) => {
     let move = resp.split(/\s+/).pop();
     if (move.endsWith(".")) {
@@ -225,33 +227,21 @@ function Play() {
       move = move.split(".").pop();
     }
 
-    // TODO: handle invalid moves!
-    gameRef.current.move(move);
+    // handle invalid moves
+    try {
+      gameRef.current.move(move);
+    } catch (error) {
+      setInvalidAIMove(true);
+      return;
+    }
 
     setFen(gameRef.current.fen());
     const lastMoveFromHistory = gameRef.current.history({ verbose: true }).pop();
     setLastMove({sourceSquare: lastMoveFromHistory.from, targetSquare: lastMoveFromHistory.to});
   };
 
-
-  const onDropFn = ({ sourceSquare, targetSquare }) => {
-    if (gameRef.current.turn() === "b") {
-      return;
-    }
-
-    try {
-      gameRef.current.move({
-        from: sourceSquare,
-        to: targetSquare,
-        promotion: "q" // warn: always promote to a queen
-      });
-    } catch (error) {
-      return;
-    }
-
-    setFen(gameRef.current.fen());
-    setLastMove({ sourceSquare, targetSquare });
-
+  const generateAIMove = () => {
+    setInvalidAIMove(false);
     respRef.current = "";
     if (!process.env.REACT_APP_OPENAI_API_KEY) {
       setResp("WARN: REACT_APP_OPENAI_API_KEY required");
@@ -306,6 +296,27 @@ function Play() {
     sourceRef.current.stream();
   };
 
+  const onDropFn = ({ sourceSquare, targetSquare }) => {
+    if (gameRef.current.turn() === "b") {
+      return;
+    }
+
+    try {
+      gameRef.current.move({
+        from: sourceSquare,
+        to: targetSquare,
+        promotion: "q" // warn: always promote to a queen
+      });
+    } catch (error) {
+      return;
+    }
+
+    setFen(gameRef.current.fen());
+    setLastMove({ sourceSquare, targetSquare });
+
+    generateAIMove();
+  };
+
   return (
     <div className="h-screen flex justify-center items-center">
       <div className="flex items-start">
@@ -319,6 +330,18 @@ function Play() {
             ? <div>
                 <div className="font-bold">{gptModel} is thinking...</div>
                 <div>{resp}</div>
+                { invalidAIMove
+                  ? <div className="pt-8">
+                      <div className="text-red-600">Invalid move :(</div>
+                      <button
+                        type="button"
+                        className="mt-2 px-2 py-1 text-sm text-center text-red-600 border border-red-600 rounded-md hover:bg-gray-100"
+                        onClick={() => generateAIMove()}>
+                        Try Again
+                      </button>
+                    </div>
+                  : null
+                }
               </div>
             : <div>
                 <span>Start a game by making a move.</span>
