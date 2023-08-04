@@ -53,20 +53,28 @@ Explain briefly the key idea behind the move and if this is a good move.
 Explain at a 2000 ELO level.
 `.trim();
 
-function analyzeHumPrompt(game) {
+function humPrompt(game) {
   const lastTurn = game.turn() === "w" ? "Black" : "White"; // note this is flipped
+  const moves = game.moves();
   const pgn = game.pgn();
   const fen = game.fen();
+  const ascii = game.ascii();
   const history = game.history();
   return `
 Last Move:
 ${lastTurn} played ${history[history.length - 1]}
+
+Candidate Moves:
+${moves}
 
 PGN:
 ${pgn}
 
 FEN:
 ${fen}
+
+ASCII representation of the board:
+${ascii}
 `.trim();
 }
 
@@ -116,7 +124,7 @@ function Analyze({ openAIAPIKey }) {
         },
         {
           "role": "user",
-          "content": analyzeHumPrompt(gameRef.current)
+          "content": humPrompt(gameRef.current)
         }
       ],
       stream: true,
@@ -183,30 +191,14 @@ function Analyze({ openAIAPIKey }) {
 const playSysPrompt = `
 Play the best chess move.
 Let's think step by step and write out our reasoning and then finally write the best move by itself on the final line.
+You have been provided a list of all candidate moves. The best move is in that list.
 
 Follow these syntactic rules carefully:
-Write the best move in Standard Algebraic Notation on the last line.
+Write the best move in Standard Algebraic Notation on the last line. You must return a move from the list of candidate moves.
 Do not write the full PGN or the turn number. For example, write "d5" instead of "1...d5"
 Do not write the best move in quotes.
 Do not end the the last line with a period after the move.
 `.trim();
-
-function playHumPrompt(game) {
-  const lastTurn = game.turn() === "w" ? "Black" : "White"; // note this is flipped
-  const pgn = game.pgn();
-  const fen = game.fen();
-  const history = game.history();
-  return `
-Last Move:
-${lastTurn} played ${history[history.length - 1]}
-
-PGN:
-${pgn}
-
-FEN:
-${fen}
-`.trim();
-}
 
 // Play mode: play against GPT
 // Human plays white and GPT plays black
@@ -268,7 +260,7 @@ function Play({ openAIAPIKey }) {
         },
         {
           "role": "user",
-          "content": playHumPrompt(gameRef.current)
+          "content": humPrompt(gameRef.current)
         }
       ],
       stream: true,
