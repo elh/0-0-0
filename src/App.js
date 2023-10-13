@@ -78,8 +78,15 @@ ${ascii}
 `.trim();
 }
 
-const gptModel = "gpt-4";
+const gptModel = "gpt-3.5-turbo-instruct";
 const gptTemperature = 0.7;
+
+// just the ones I was using
+const isChatModel = {
+  "gpt-3.5-turbo-instruct": false,
+  "gpt-3.5-turbo": true,
+  "gpt-4": true
+}
 
 // Analyze mode: play out a game and GPT will explain moves.
 function Analyze({ openAIAPIKey }) {
@@ -129,6 +136,16 @@ function Analyze({ openAIAPIKey }) {
       ],
       stream: true,
     };
+    if (!isChatModel[gptModel]) {
+      url = "https://api.openai.com/v1/completions";
+      data = {
+        model: gptModel,
+        temperature: gptTemperature,
+        prompt: analyzeSysPrompt + "\n" + humPrompt(gameRef.current),
+        max_tokens: 1024,
+        stream: true,
+      };
+    }
 
     // kill current stream if it exists
     if (sourceRef.current) {
@@ -147,7 +164,7 @@ function Analyze({ openAIAPIKey }) {
     sourceRef.current.addEventListener("message", (e) => {
       if (e.data !== "[DONE]") {
         let payload = JSON.parse(e.data);
-        let text = payload.choices[0].delta.content;
+        let text = isChatModel[gptModel] ? payload.choices[0].delta.content : payload.choices[0].text;
         if (text) {
           respRef.current = respRef.current + text;
           setExplanation(respRef.current);
@@ -265,6 +282,16 @@ function Play({ openAIAPIKey }) {
       ],
       stream: true,
     };
+    if (!isChatModel[gptModel]) {
+      url = "https://api.openai.com/v1/completions";
+      data = {
+        model: gptModel,
+        temperature: gptTemperature,
+        prompt: playSysPrompt + "\n" + humPrompt(gameRef.current),
+        max_tokens: 1024,
+        stream: true,
+      };
+    }
 
     // kill current stream if it exists
     if (sourceRef.current) {
@@ -283,7 +310,7 @@ function Play({ openAIAPIKey }) {
     sourceRef.current.addEventListener("message", (e) => {
       if (e.data !== "[DONE]") {
         let payload = JSON.parse(e.data);
-        let text = payload.choices[0].delta.content;
+        let text = isChatModel[gptModel] ? payload.choices[0].delta.content : payload.choices[0].text;
         if (text) {
           respRef.current = respRef.current + text;
           setResp(respRef.current);
