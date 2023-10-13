@@ -29,7 +29,7 @@ function Board({ disabled, fen, lastMove, onDropFn = ({ sourceSquare, targetSqua
       boardStyle={{}}
       squareStyles={squareStyling(lastMove)}
       dropSquareStyle={{ boxShadow: "inset 0 0 1px 2px rgb(255, 255, 0)" }}
-      allowDrag={() => !disabled}
+      draggable={!disabled}
     />
   )
 }
@@ -78,10 +78,12 @@ ${ascii}
 `.trim();
 }
 
-const gptModel = "gpt-3.5-turbo-instruct";
+const gptModelPlay = "gpt-3.5-turbo-instruct";
+const gptModelAnalyze = "gpt-4";
 const gptTemperature = 0.7;
 
-// just the ones I was using
+// HACK: I added a lot of random checks because I wasn't sure if I really wanted to switch.
+// gpt-3.5-turbo-instruct is surprisingly good with just the PGN. Consider cleaning up later.
 const isChatModel = {
   "gpt-3.5-turbo-instruct": false,
   "gpt-3.5-turbo": true,
@@ -122,7 +124,7 @@ function Analyze({ openAIAPIKey }) {
 
     let url = "https://api.openai.com/v1/chat/completions";
     let data = {
-      model: gptModel,
+      model: gptModelAnalyze,
       temperature: gptTemperature,
       messages: [
         {
@@ -136,10 +138,10 @@ function Analyze({ openAIAPIKey }) {
       ],
       stream: true,
     };
-    if (!isChatModel[gptModel]) {
+    if (!isChatModel[gptModelAnalyze]) {
       url = "https://api.openai.com/v1/completions";
       data = {
-        model: gptModel,
+        model: gptModelAnalyze,
         temperature: gptTemperature,
         prompt: analyzeSysPrompt + "\n" + humPrompt(gameRef.current),
         max_tokens: 1024,
@@ -164,7 +166,7 @@ function Analyze({ openAIAPIKey }) {
     sourceRef.current.addEventListener("message", (e) => {
       if (e.data !== "[DONE]") {
         let payload = JSON.parse(e.data);
-        let text = isChatModel[gptModel] ? payload.choices[0].delta.content : payload.choices[0].text;
+        let text = isChatModel[gptModelAnalyze] ? payload.choices[0].delta.content : payload.choices[0].text;
         if (text) {
           respRef.current = respRef.current + text;
           setExplanation(respRef.current);
@@ -189,11 +191,11 @@ function Analyze({ openAIAPIKey }) {
         <div className="px-8 w-[600px] max-h-[600px] overflow-auto">
           { explanation
             ? <div>
-                <div className="font-bold">{gptModel} says</div>
+                <div className="font-bold">{gptModelAnalyze} says</div>
                 <div>{explanation}</div>
               </div>
             : <div>
-                <span>Make moves on the board for GPT to analyze.</span>
+                <span>Make moves on the board for {gptModelAnalyze} to analyze.</span>
                 {/* <span>Make a move on the board or load a position with FEN</span>
                 <input type="text" id="fen" class="border border-gray-500 text-sm rounded-md w-full p-1 mt-6" placeholder="8/6pk/6rp/p4Q2/1bp4P/3qB1P1/5P2/2R3K1 w - - 1 49" required />
                 <button type="button" class="mt-2 px-3 py-2 text-sm text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800">Load</button> */}
@@ -222,6 +224,7 @@ Do not end the the last line with a period after the move.
 function Play({ openAIAPIKey }) {
   // LLM generation
   const [resp, setResp] = React.useState("");
+  const [lastPGN, setLastPGN] = React.useState("");
   const respRef = useRef("");
   const sourceRef = useRef(null);
 
@@ -233,15 +236,7 @@ function Play({ openAIAPIKey }) {
   const [gameOver, setGameOver] = React.useState(false);
   const [invalidAIMove, setInvalidAIMove] = React.useState(false);
 
-  const playAIMove = (resp) => {
-    let move = resp.split(/\s+/).pop();
-    if (move.endsWith(".")) {
-      move = move.slice(0, -1);
-    }
-    if (move.includes(".")) {
-      move = move.split(".").pop();
-    }
-
+  const playAIMove = (move) => {
     // handle invalid moves
     try {
       gameRef.current.move(move);
@@ -259,6 +254,7 @@ function Play({ openAIAPIKey }) {
   };
 
   const generateAIMove = () => {
+    setLastPGN(gameRef.current.pgn());
     setInvalidAIMove(false);
     respRef.current = "";
     if (!openAIAPIKey) {
@@ -268,7 +264,7 @@ function Play({ openAIAPIKey }) {
 
     let url = "https://api.openai.com/v1/chat/completions";
     let data = {
-      model: gptModel,
+      model: gptModelPlay,
       temperature: gptTemperature,
       messages: [
         {
@@ -282,13 +278,14 @@ function Play({ openAIAPIKey }) {
       ],
       stream: true,
     };
-    if (!isChatModel[gptModel]) {
+    if (!isChatModel[gptModelPlay]) {
+      // do not CoT for non-chat models. just give the PGN so far and ask for a completion of it.
       url = "https://api.openai.com/v1/completions";
       data = {
-        model: gptModel,
+        model: gptModelPlay,
         temperature: gptTemperature,
-        prompt: playSysPrompt + "\n" + humPrompt(gameRef.current),
-        max_tokens: 1024,
+        prompt: gameRef.current.pgn(),
+        max_tokens: 16, // could be something like 50... 0-0-0
         stream: true,
       };
     }
@@ -310,14 +307,40 @@ function Play({ openAIAPIKey }) {
     sourceRef.current.addEventListener("message", (e) => {
       if (e.data !== "[DONE]") {
         let payload = JSON.parse(e.data);
-        let text = isChatModel[gptModel] ? payload.choices[0].delta.content : payload.choices[0].text;
+        let text = isChatModel[gptModelPlay] ? payload.choices[0].delta.content : payload.choices[0].text;
         if (text) {
           respRef.current = respRef.current + text;
           setResp(respRef.current);
         }
       } else {
         sourceRef.current.close();
-        playAIMove(respRef.current);
+
+        let move = "";
+        if (isChatModel[gptModelPlay]) {
+          // if chat model, the move is the final space separated substring.
+          // response is CoT-ed text.
+          move = respRef.current.split(/\s+/).pop();
+          if (move.endsWith(".")) {
+            move = move.slice(0, -1);
+          }
+          if (move.includes(".")) {
+            move = move.split(".").pop();
+          }
+        } else {
+          // else, the move is the first space separated substring after the first period.
+          // response is a PGN continuation.
+
+          // split respRef.current by spaces and move is the first substring without a period
+          const words = respRef.current.trim().split(/\s+/);
+          for (let i = 0; i < words.length; i++) {
+            if (!words[i].endsWith(".")) {
+              move = words[i];
+              break;
+            }
+          }
+          console.log(words)
+        }
+        playAIMove(move);
       }
     });
 
@@ -364,8 +387,11 @@ function Play({ openAIAPIKey }) {
         <div className="px-8 w-[600px] max-h-[600px] overflow-auto">
           { resp
             ? <div>
-                <div className="font-bold">{gptModel} is thinking...</div>
-                <div>{resp}</div>
+                { !isChatModel[gptModelPlay] &&
+                  <div className="text-gray-600 mb-4">{lastPGN}</div>
+                }
+                <div className="font-bold">{gptModelPlay}:</div>
+                <div>{resp.trim()}</div>
                 { invalidAIMove &&
                   <div className="pt-8">
                     <div className="text-red-600">Invalid move :(</div>
@@ -396,7 +422,7 @@ function Play({ openAIAPIKey }) {
                 }
               </div>
             : <div>
-                <span>Start a game against GPT by making a move.</span>
+                <span>Start a game against {gptModelPlay} by making a move.</span>
               </div>
           }
         </div>
