@@ -253,6 +253,36 @@ function Play({ openAIAPIKey }) {
     }
   };
 
+  const readMove = (output) => {
+    let move = "";
+    if (isChatModel[gptModelPlay]) {
+      // if chat model, the move is the final space separated substring.
+      // response is CoT-ed text.
+      move = output.split(/\s+/).pop();
+      if (move.endsWith(".")) {
+        move = move.slice(0, -1);
+      }
+      if (move.includes(".")) {
+        move = move.split(".").pop();
+      }
+    } else {
+      // else, the move is the first space separated substring after the first period.
+      // response is a PGN continuation.
+
+      // split output by spaces and move is the first substring without a period
+      const words = output.trim().split(/\s+/);
+      for (let i = 0; i < words.length; i++) {
+        if (!words[i].endsWith(".")) {
+          move = words[i];
+          break;
+        }
+      }
+      // console.log(words)
+    }
+
+    return move;
+  }
+
   const generateAIMove = () => {
     setLastPGN(gameRef.current.pgn());
     setInvalidAIMove(false);
@@ -319,36 +349,14 @@ function Play({ openAIAPIKey }) {
           let text = isChatModel[gptModelPlay] ? payload.choices[0].delta.content : payload.choices[0].text;
           if (text) {
             respRef.current = respRef.current + text;
-            setResp(respRef.current);
+
+            let move = readMove(respRef.current);
+            setResp(move);
           }
         } else {
           sourceRef.current.close();
 
-          let move = "";
-          if (isChatModel[gptModelPlay]) {
-            // if chat model, the move is the final space separated substring.
-            // response is CoT-ed text.
-            move = respRef.current.split(/\s+/).pop();
-            if (move.endsWith(".")) {
-              move = move.slice(0, -1);
-            }
-            if (move.includes(".")) {
-              move = move.split(".").pop();
-            }
-          } else {
-            // else, the move is the first space separated substring after the first period.
-            // response is a PGN continuation.
-
-            // split respRef.current by spaces and move is the first substring without a period
-            const words = respRef.current.trim().split(/\s+/);
-            for (let i = 0; i < words.length; i++) {
-              if (!words[i].endsWith(".")) {
-                move = words[i];
-                break;
-              }
-            }
-            // console.log(words)
-          }
+          let move = readMove(respRef.current);
           playAIMove(move);
         }
       }
