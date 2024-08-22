@@ -197,8 +197,8 @@ function Analyze({ openAIAPIKey }) {
             : <div>
                 <span>Make moves on the board for {gptModelAnalyze} to analyze.</span>
                 {/* <span>Make a move on the board or load a position with FEN</span>
-                <input type="text" id="fen" class="border border-gray-500 text-sm rounded-md w-full p-1 mt-6" placeholder="8/6pk/6rp/p4Q2/1bp4P/3qB1P1/5P2/2R3K1 w - - 1 49" required />
-                <button type="button" class="mt-2 px-3 py-2 text-sm text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800">Load</button> */}
+                <input type="text" id="fen" className="border border-gray-500 text-sm rounded-md w-full p-1 mt-6" placeholder="8/6pk/6rp/p4Q2/1bp4P/3qB1P1/5P2/2R3K1 w - - 1 49" required />
+                <button type="button" className="mt-2 px-3 py-2 text-sm text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800">Load</button> */}
               </div>
           }
         </div>
@@ -438,7 +438,7 @@ export default function App() {
 
   return (
     <div>
-      <div class="absolute top-4 right-4 flex items-center">
+      <div className="absolute top-4 right-4 flex items-center">
         <button
           type="button"
           className="mx-2 px-2 py-1 text-xs text-center text-gray-600 border border-gray-600 rounded-md hover:bg-gray-100"
@@ -457,9 +457,9 @@ export default function App() {
 
       {/* On change, save this locally */}
       { openAIAPIKey === "" &&
-        <div class="flex items-center justify-center mt-4">
-          <label for="small-input" class="text-xs font-medium text-red-600">OpenAI API Key*</label>
-          <input type="password" id="small-input" class="w-96 mx-2 px-2 py-1 text-xs text-gray-600 border border-red-600 rounded-md" onBlur={
+        <div className="flex items-center justify-center mt-4">
+          <label htmlFor="small-input" className="text-xs font-medium text-red-600">OpenAI API Key*</label>
+          <input type="password" id="small-input" className="w-96 mx-2 px-2 py-1 text-xs text-gray-600 border border-red-600 rounded-md" onBlur={
             (e) => {
               if (e.target.value !== "") {
                 setOpenAIAPIKey(e.target.value);
@@ -469,7 +469,7 @@ export default function App() {
         </div>
       }
 
-      <div class="mt-20">
+      <div className="mt-20">
         { mode === "play"
           ? <Play openAIAPIKey={openAIAPIKey} />
           : <Analyze openAIAPIKey={openAIAPIKey} />
